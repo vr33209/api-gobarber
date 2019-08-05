@@ -1,8 +1,12 @@
 import * as Yup from 'yup';
-import { startOfHour, parseISO, isBefore } from 'date-fns';
+import { startOfHour, parseISO, isBefore, format, subHours } from 'date-fns';
+import pt from 'date-fns/locale/pt';
 import User from '../models/User';
 import Appointments from '../models/Appointments';
 import File from '../models/File';
+import Notification from '../schemas/Notifications';
+
+import Mail from '../../lib/mail';
 
 class AppointmentController {
   async index(req, res) {
@@ -73,6 +77,64 @@ class AppointmentController {
       user_id: req.userId,
       provider_id,
       date,
+    });
+
+    const user = await User.findByPk(req.userId);
+    const formatDate = format(hourStart, "' dia 'dd 'de' MMMM', às' H:mm'h'", {
+      locale: pt,
+    });
+
+    await Notification.create({
+      content: `Novo agendamento de ${user.name} realizado para o ${formatDate} !`,
+      user: provider_id,
+    });
+
+    return res.send(appointment);
+  }
+
+  async delete(req, res) {
+    const appointment = await Appointments.findByPk(req.params.id, {
+      include: [
+        {
+          model: User,
+          as: 'provider',
+          attributes: ['name', 'email'],
+        },
+        {
+          model: User,
+          as: 'user',
+          attributes: ['name'],
+        },
+      ],
+    });
+    if (appointment.user_id !== req.userId) {
+      return res.status(401).send({
+        error: 'Voçê não tem permissão para excluir esse agendamento !',
+      });
+    }
+    const dateWithSub = subHours(Appointments.date, 2);
+
+    if (isBefore(dateWithSub, new Date())) {
+      return res.status(401).send({
+        error:
+          'Voçê só pode cancelar o agendamento com duas horas de antecendência !',
+      });
+    }
+
+    appointment.canceled_at = new Date();
+    await appointment.save();
+
+    Mail.sendEmail({
+      to: `${appointment.provider.name} <${appointment.provider.email}>`,
+      subject: 'Agendamento cancelado',
+      template: 'cancelation',
+      context: {
+        provider: appointment.provider.name,
+        user: appointment.user.name,
+        date: format(appointment.date, "' dia 'dd 'de' MMMM', às' H:mm'h'", {
+          locale: pt,
+        }),
+      },
     });
     return res.send(appointment);
   }
