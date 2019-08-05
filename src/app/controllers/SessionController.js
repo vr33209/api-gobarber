@@ -24,7 +24,7 @@ class SessionController {
     }
 
     if (!(await user.checkPassowrd(password))) {
-      return res.status(400).send({ error: 'Senha invalidac!!' });
+      return res.status(400).send({ error: 'Senha invalida!!' });
     }
 
     const { id, name } = user;
@@ -35,7 +35,9 @@ class SessionController {
         name,
         email,
       },
-      token: jwt.sign({ id }, Auth.secret, Auth.expiresIn),
+      token: jwt.sign({ id }, Auth.secret, {
+        expiresIn: Auth.expiresIn,
+      }),
     });
   }
 }
