@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import * as Yup from 'yup';
 import User from '../models/User';
 import Auth from '../../config/auth';
+import File from '../models/File';
 
 class SessionController {
   async create(req, res) {
@@ -17,7 +18,16 @@ class SessionController {
     }
 
     const { email, password } = req.body;
-    const user = await User.findOne({ where: { email } });
+    const user = await User.findOne({
+      where: { email },
+      include: [
+        {
+          model: File,
+          as: 'avatar',
+          attributes: ['id', 'path', 'url'],
+        },
+      ],
+    });
 
     if (!user) {
       return res.status(400).send({ error: 'Usuario não encontrado !' });
@@ -27,13 +37,15 @@ class SessionController {
       return res.status(400).send({ error: 'Senha invalida!!' });
     }
 
-    const { id, name } = user;
+    const { id, name, avatar, provider } = user;
 
     return res.send({
       user: {
         id,
         name,
         email,
+        avatar,
+        provider,
       },
       token: jwt.sign({ id }, Auth.secret, {
         expiresIn: Auth.expiresIn,

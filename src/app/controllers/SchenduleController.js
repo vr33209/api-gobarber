@@ -20,12 +20,20 @@ class SchenduleController {
 
     const appointments = await Appointment.findAll({
       where: {
-        id: req.userId,
+        provider_id: req.userId,
         canceled_at: null,
         date: { [Op.between]: [startOfDay(parseDate), endOfDay(parseDate)] },
       },
+      include: [
+        {
+          model: User,
+          as: 'user',
+          attributes: ['name'],
+        },
+      ],
       order: ['date'],
     });
+
     return res.send(appointments);
   }
 }
